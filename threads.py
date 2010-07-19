@@ -2,9 +2,8 @@ import time
 import threading
 
 from datetime import datetime
-
-NODE_LIST_UPDATE_INTERVAL = 30
-NODE_METRICS_UPDATE_INTERVAL = 5
+from constants import NODE_LIST_UPDATE_INTERVAL, \
+                      NODE_METRICS_UPDATE_INTERVAL
 
 class NodeListThread(threading.Thread):
   def __init__(self, parent):
