@@ -1,6 +1,7 @@
 import sys
 import time
 import curses
+import threading
 import signal
 
 from datetime import datetime
@@ -18,8 +19,6 @@ SCREEN_MIN_Y = 24
 SCREEN_NODE_LIST_START = 0.55
 
 SCREEN_REDRAW_INTERVAL = 0.1
-NODE_LIST_UPDATE_INTERVAL = 30
-NODE_METRICS_UPDATE_INTERVAL = 5
 
 # Node list table rows and columns
 NODE_TABLE_COLUMNS = (
@@ -56,16 +55,19 @@ class Screen(object):
     
     self.min_y = 0
     self.min_x = 0
-    self.min_v = 0
     
     self.cursor_pos = 0
+    self.previously_selected_node = None
+    self.selected_node = None
     self.min_cursor_pos = 0
     self.max_cursor_pos = 0
     
     self.node_list_thread = None
     self.node_metrics_thread = None
-    
-    self.updating_metrics = False
+
+    self.updating_node_list = False
+    self.updating_node_metrics = False
+    self.last_updated_node = None
     self.last_updated = None
     
     self.nodes = []
@@ -74,8 +76,10 @@ class Screen(object):
     self.table_lines = []
 
   def run(self):
-    i, j = 1, 1
-    self._update_node_list()
+    self._run_worker_threads()
+    self._main_loop()
+  
+  def _main_loop(self):
     while True:
       self._redraw() 
       event = self.screen.getch()
@@ -87,18 +91,28 @@ class Screen(object):
         self._handle_movement_key(event)
       else:
         self._handle_event(event)
-        
-      if i == NODE_LIST_UPDATE_INTERVAL * 10:
-        self._update_node_list()
-        i = 0
-        
-      if j == NODE_METRICS_UPDATE_INTERVAL * 10:
-        self._update_node_metrics()
-        j = 0
-      
-      i += 1
-      j += 1
+
       time.sleep(SCREEN_REDRAW_INTERVAL)
+  
+  def _run_worker_threads(self):
+    # Start the node list and metrics update threads
+    self.node_list_thread = NodeListThread(self)
+    self.node_list_thread.daemon = True
+    self.node_list_thread.start()
+    
+    self.node_metrics_thread = NodeMetricsThread(self)
+    self.node_metrics_thread.daemon = True
+    self.node_metrics_thread.start()
+    
+  def _update_node_metrics(self, update_now = False):
+    try:
+      self.selected_node = self.nodes[self.cursor_pos]
+    except IndexError:
+      self.selected_node = None
+    
+    if self.selected_node and self.selected_node.has_key('id'):
+      self.node_metrics_thread.node_id = self.selected_node['id']
+      self.node_metrics_thread.update_now = update_now
         
   def _get_screen(self):
     screen = curses.initscr()
@@ -134,7 +148,8 @@ class Screen(object):
       name = node['name']
       ip_address = node['ipaddress']
       
-      if self.updating_metrics:
+      if self.updating_node_metrics and \
+        self.last_updated_node != node['id']:
         cpu = 'loading...'
         memory = 'loading...'
         disk = 'loading...'
@@ -213,24 +228,6 @@ class Screen(object):
         columns = '' . join(columns)
         self.table_lines.append(columns)
         self.addstr(coord_y, self.min_x, columns)
-  
-  def _update_node_metrics(self):
-    # Node metric update thread is only
-    # started if there is no previous thread alive
-    if (not self.node_metrics_thread or \
-       not self.node_metrics_thread.is_alive()) \
-       and self.nodes:
-      node_id = self.nodes[self.cursor_pos]['id']
-      self.node_metrics_thread = NodeMetricsThread(self, node_id)
-      self.node_metrics_thread.daemon = True
-      self.node_metrics_thread.start()
-  
-  def _update_node_list(self):
-    if not self.node_list_thread or \
-       not self.node_list_thread.is_alive():
-      self.node_list_thread = NodeListThread(self)
-      self.node_list_thread.thread = True
-      self.node_list_thread.start()
 
   def _draw_header(self):
     time = datetime.strftime(datetime.now(), '%m/%d/%Y %I:%M %p')
@@ -253,12 +250,10 @@ class Screen(object):
     else:
       last_updated = '/'
       
-    if self.node_list_thread and \
-       self.node_list_thread.is_alive():
+    if self.updating_node_list:
       status = 'updating node list...'
-    elif self.node_metrics_thread and \
-         self.node_metrics_thread.is_alive():
-      status = 'updating node data...'
+    elif self.updating_node_metrics:
+      status = 'updating node metrics...'
     else:
       status = ''
 
@@ -352,10 +347,14 @@ class Screen(object):
   # Event handlers
   def _handle_key_event(self, key):
     if key in 'u':
-      self._update_node_metrics()
+      self._update_node_metrics(update_now = True)
     elif key in 'qQ':
-        self._reset()
-        sys.exit()
+      for thread in threading.enumerate():
+        if thread != threading.current_thread():
+          thread.running = False
+          thread.join()
+      self._reset()
+      sys.exit()
         
   def _handle_movement_key(self, key):
     # Highlight the corresponding node in the list
@@ -374,8 +373,7 @@ class Screen(object):
     elif key == curses.KEY_NPAGE:
       self.cursor_pos = self.max_cursor_pos
     
-    self.updating_metrics = True
-    self._update_node_metrics()
+    self._update_node_metrics(update_now = True)
         
   def _handle_event(self, event):
     if event == curses.KEY_RESIZE:
