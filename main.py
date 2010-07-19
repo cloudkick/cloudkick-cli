@@ -318,12 +318,7 @@ class Screen(object):
     if key in 'u':
       self._update_node_metrics(update_now = True)
     elif key in 'qQ':
-      for thread in threading.enumerate():
-        if thread != threading.current_thread():
-          thread.running = False
-          thread.join()
-      self._reset()
-      sys.exit()
+      exit_handler()
         
   def _handle_movement_key(self, key):
     # Highlight the corresponding node in the list
@@ -382,7 +377,13 @@ class ScreenLine(object):
   def __init__(self, text = ''):
     self.text = text
 
-def exit_handler(sig_num, frame):
+def exit_handler(*args):
+  # Wait for and stop all the running threads
+  for thread in threading.enumerate():
+    if thread != threading.current_thread():
+      thread.running = False
+      thread.join()
+          
   screen._reset()
   sys.exit(0)
   
