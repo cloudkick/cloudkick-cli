@@ -5,7 +5,8 @@ from formatting import normalize_cpu, normalize_mem, normalize_disk, \
 SCREEN_MIN_X = 80
 SCREEN_MIN_Y = 24
 
-SCREEN_NODE_LIST_START = 0.55
+SCREEN_NODE_TABLE_START = 13
+SCREEN_NODE_LIST_START = 13
 
 SCREEN_REDRAW_INTERVAL = 0.1
 NODE_LIST_UPDATE_INTERVAL = 30

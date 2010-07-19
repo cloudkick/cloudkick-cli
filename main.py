@@ -7,9 +7,9 @@ import signal
 from datetime import datetime
 from optparse import OptionParser
 from threads import NodeListThread, NodeMetricsThread
-from constants import SCREEN_MIN_X, SCREEN_MIN_Y, SCREEN_NODE_LIST_START, \
-                      SCREEN_REDRAW_INTERVAL, NODE_TABLE_COLUMNS, NODE_TABLE_ROWS, \
-                      NODE_METRICS
+from constants import SCREEN_MIN_X, SCREEN_MIN_Y, SCREEN_NODE_TABLE_START, \
+                      SCREEN_NODE_LIST_START, SCREEN_REDRAW_INTERVAL, \
+                      NODE_TABLE_COLUMNS, NODE_TABLE_ROWS, NODE_METRICS
 
 from cloudkick.base import Connection
 
@@ -184,7 +184,7 @@ class Screen(object):
     self.table_lines = []
     for index, node in enumerate(self.nodes):
 
-      coord_y = (self.max_y * SCREEN_NODE_LIST_START) + (index + 2)
+      coord_y = (self.min_y + SCREEN_NODE_LIST_START) + (index + 2)
       if coord_y < self.max_y - 1:
         
         columns = []
@@ -251,7 +251,7 @@ class Screen(object):
       columns.append(column_string)
     
     columns = '' . join(columns)
-    self.addstr(self.max_y * 0.55, self.min_x, columns, curses.A_REVERSE)
+    self.addstr(self.min_y + SCREEN_NODE_TABLE_START, self.min_x, columns, curses.A_REVERSE)
     
   def _get_table_column_string(self, text, width, align):
     width = int(self.max_x * (width / 100.0))
