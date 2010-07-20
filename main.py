@@ -9,7 +9,8 @@ from optparse import OptionParser
 from threads import NodeListThread, NodeMetricsThread
 from constants import SCREEN_MIN_X, SCREEN_MIN_Y, SCREEN_NODE_TABLE_START, \
                       SCREEN_NODE_LIST_START, SCREEN_REDRAW_INTERVAL, \
-                      NODE_TABLE_COLUMNS, NODE_TABLE_ROWS, NODE_METRICS
+                      NODE_TABLE_COLUMNS, NODE_TABLE_ROWS, NODE_METRICS, \
+                      CHART_METRICS
 
 from cloudkick.base import Connection
 
@@ -94,9 +95,10 @@ class Screen(object):
       curses.use_default_colors()
       
       # Initialize the colors
-      curses.init_pair(1, curses.COLOR_GREEN, -1)
-      curses.init_pair(2, curses.COLOR_BLUE, -1)
-      curses.init_pair(3, curses.COLOR_RED, -1)
+      curses.init_pair(1, curses.COLOR_WHITE, -1)
+      curses.init_pair(2, curses.COLOR_GREEN, -1)
+      curses.init_pair(3, curses.COLOR_BLUE, -1)
+      curses.init_pair(4, curses.COLOR_RED, -1)
     
     screen.keypad(1)
     screen.nodelay(1)
@@ -107,6 +109,11 @@ class Screen(object):
   
   def _draw_node_data(self):
     # Draws the node data on the upper part of the screen
+    
+    metrics = {}
+    for metric in CHART_METRICS:
+      metrics[metric] = {}
+          
     if self.nodes and \
       self.node_metrics.has_key('cpu') and \
       self.node_metrics.has_key('mem') and \
@@ -116,25 +123,20 @@ class Screen(object):
 
       name = node['name']
       ip_address = node['ipaddress']
-      
+
       if self.updating_node_metrics and \
         self.last_updated_node != node['id']:
-        cpu = 'loading...'
-        memory = 'loading...'
-        disk = 'loading...'
+        
+        for metric in CHART_METRICS:
+          metrics[metric]['chart'] = 'loading... '
       else:
-        cpu =  self._get_vertical_chart('cpu', node_metrics['cpu'])
-        memory = self._get_vertical_chart('mem', node_metrics['mem'])
-        disk = self._get_vertical_chart('disk', node_metrics['disk'])
+        for metric in CHART_METRICS:
+          metrics[metric]['chart'], metrics[metric]['meta'], metrics[metric]['percent'] =  self._get_vertical_chart(metric, node_metrics[metric])
       
       tags = ', ' . join(node['tags'])
     else:
       name = '/'
-      ip_address = '/'
-      cpu = '/'
-      memory = '/'
-      disk = '/'
-      
+      ip_address = '/'      
       tags = '/'
     
     self.addstr(self.min_y + 3, self.min_x + 2,
@@ -142,17 +144,21 @@ class Screen(object):
     self.addstr(self.min_y + 4, self.min_x + 2,
                 'IP address: %s' % (ip_address))
     
-    self.addstr(self.min_y + 6, self.min_x + 2,
-                'CPU:    %s' % cpu)
-    self.addstr(self.min_y + 7, self.min_x + 2,
-                'Memory: %s' % (memory))
-    self.addstr(self.min_y + 8, self.min_x + 2,
-                'Disk:   %s' % (disk))
+    for index, metric in enumerate(CHART_METRICS):
+      metric_data = metrics[metric]
+      percent = metric_data.get('percent', '')
+      chart = metric_data.get('chart', '')
+      meta = metric_data.get('meta', '')
+      self.addstr(self.min_y + 6 + index, self.min_x + 2,
+                  '%s:' % (metric.capitalize()))
+      self._draw_chart(self.min_y + 6 + index, self.min_x + 10, 
+                       percent, chart, meta)
+
     self.addstr(self.min_y + 10, self.min_x + 2,
                 'Tags: %s' % (tags))
     
   def _get_vertical_chart(self, check, metrics):
-    # Returns a chart for provided metric
+    # Return chart data for the provided metric
     chart_metric = NODE_METRICS[check]['chart_metric']
     display_metrics = NODE_METRICS[check]['metrics']
     wanted_metrics = display_metrics + [chart_metric]
@@ -175,9 +181,31 @@ class Screen(object):
         
     display_values = tuple([str(node_metrics[m]) for m in display_metrics])
     display_values = NODE_METRICS[check]['format_function'](*display_values)
-    chart = '[%s] %s%% used (%s)' % (lines, percent, (NODE_METRICS[check]['chart_text'] % display_values))
+    chart = '%s' % (lines)
+    chart_meta = '%s%% used (%s)' % (percent, (NODE_METRICS[check]['chart_text'] % display_values))
     
-    return chart
+    return chart, chart_meta, percent
+  
+  def _draw_chart(self, y_offset, x_offset, percent, chart, chart_meta = ''):
+    chart_length = len(chart) or 1
+    if percent == None:
+      color = curses.color_pair(1)
+    elif percent < 50:
+      color = curses.color_pair(2)
+    elif percent >= 50 and percent <= 75:
+      color = curses.color_pair(3)
+    else:
+      color = curses.color_pair(4)
+    
+    self.addstr(y_offset, x_offset,
+                '[', curses.A_BOLD)
+    self.addstr(y_offset, x_offset + 1,
+                chart, color)
+    self.addstr(y_offset, x_offset + chart_length,
+                ']', curses.A_BOLD)
+    
+    self.addstr(y_offset, x_offset + chart_length + 2,
+                chart_meta)
     
   def _draw_node_list(self):
     # Draws the node list in the bottom part of the screen
@@ -287,7 +315,7 @@ class Screen(object):
       else:
         attr = 0
       
-      coord_y = (self.max_y * SCREEN_NODE_LIST_START) + (index + 2)
+      coord_y = (self.min_y + SCREEN_NODE_LIST_START) + (index + 2)
       if coord_y < self.max_y - 1:
         self.addstr(coord_y, self.min_x, line, attr)
     

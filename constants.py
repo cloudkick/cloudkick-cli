@@ -12,6 +12,8 @@ SCREEN_REDRAW_INTERVAL = 0.1
 NODE_LIST_UPDATE_INTERVAL = 30
 NODE_METRICS_UPDATE_INTERVAL = 5
 
+CHART_METRICS = ('cpu', 'mem', 'disk')
+
 # Node list table rows and columns
 NODE_TABLE_COLUMNS = (
   {'name': 'name', 'width': 36, 'align': 'center'},
