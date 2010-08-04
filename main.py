@@ -88,7 +88,12 @@ class Screen(object):
     screen = curses.initscr()
     
     curses.noecho()
-    curses.curs_set(0)
+    
+    try:
+      # Try to hide the cursor
+      curses.curs_set(0)
+    except Exception:
+      pass
     
     if curses.has_colors():
       curses.start_color()
