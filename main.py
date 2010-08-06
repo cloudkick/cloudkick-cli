@@ -15,7 +15,7 @@ from constants import SCREEN_MIN_X, SCREEN_MIN_Y, SCREEN_NODE_TABLE_START, \
 from cloudkick.base import Connection
 
 __title__ = 'Cloudkick CLI'
-__version__ = '0.1-pre-alpha'
+__version__ = '0.1-dev'
 
 class Screen(object):
   
@@ -470,3 +470,4 @@ if __name__ == '__main__':
     screen._reset()
     print e
     sys.exit(1)
+
