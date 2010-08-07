@@ -12,7 +12,13 @@ from constants import SCREEN_MIN_X, SCREEN_MIN_Y, SCREEN_NODE_TABLE_START, \
                       NODE_TABLE_COLUMNS, NODE_TABLE_ROWS, NODE_METRICS, \
                       CHART_METRICS
 
-from cloudkick.base import Connection
+try:
+  from cloudkick.base import Connection
+except ImportError:
+  print 'You need to have cloudkick-py library installed to use this application. ' \
+        'You can get it at http://github.com/cloudkick/cloudkick-py'
+  sys.exit(1)
+
 
 __title__ = 'Cloudkick CLI'
 __version__ = '0.1-dev'
