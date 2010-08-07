@@ -139,10 +139,14 @@ class Screen(object):
         self.last_updated_node != node['id']:
         
         for metric in CHART_METRICS:
-          metrics[metric]['chart'] = 'loading... '
+          metrics[metric]['chart'] = 'loading...'
       else:
         for metric in CHART_METRICS:
-          metrics[metric]['chart'], metrics[metric]['meta'], metrics[metric]['percent'] =  self._get_vertical_chart(metric, node_metrics[metric])
+          chart_metric = [check_data for check_data in node_metrics[metric] if check_data['name'] == NODE_METRICS[metric]['chart_metric']]
+          if not chart_metric:
+            metrics[metric]['chart'] = 'error loading chart metric'
+          else:
+            metrics[metric]['chart'], metrics[metric]['meta'], metrics[metric]['percent'] =  self._get_vertical_chart(metric, node_metrics[metric])
       
       tags = ', ' . join(node['tags'])
     else:
@@ -212,10 +216,10 @@ class Screen(object):
                 '[', curses.A_BOLD)
     self.addstr(y_offset, x_offset + 1,
                 chart, color)
-    self.addstr(y_offset, x_offset + chart_length,
+    self.addstr(y_offset, x_offset + chart_length + 1,
                 ']', curses.A_BOLD)
     
-    self.addstr(y_offset, x_offset + chart_length + 2,
+    self.addstr(y_offset, x_offset + chart_length + 3,
                 chart_meta)
     
   def _draw_node_list(self):
